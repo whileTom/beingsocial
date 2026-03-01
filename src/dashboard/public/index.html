@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Being Social - Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --sidebar-bg: #1f1f1f;
+            --chat-bg: #000000;
+            --text-color: #e0e0e0;
+            --accent-color: #bb86fc;
+            --message-bg-in: #2c2c2c;
+            --message-bg-out: #3700b3;
+            --whatsapp-color: #25d366;
+            --instagram-color: #e1306c;
+            --border-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+        }
+
+        .thread-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .thread-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .thread-item:hover {
+            background-color: #2a2a2a;
+        }
+
+        .thread-item.active {
+            background-color: #333;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .thread-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1rem;
+            color: #fff;
+        }
+
+        .thread-info p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .badge {
+            font-size: 0.70rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge.whatsapp {
+            background-color: rgba(37, 211, 102, 0.2);
+            color: var(--whatsapp-color);
+        }
+
+        .badge.instagram {
+            background-color: rgba(225, 48, 108, 0.2);
+            color: var(--instagram-color);
+        }
+
+        /* Chat View */
+        .chat-view {
+            background-color: var(--chat-bg);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-header {
+            padding: 20px;
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            margin: 0;
+        }
+
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            line-height: 1.4;
+            position: relative;
+        }
+
+        .message.incoming {
+            background-color: var(--message-bg-in);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .message.outgoing {
+            background-color: var(--message-bg-out);
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message-meta {
+            display: block;
+            font-size: 0.75rem;
+            margin-top: 5px;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #555;
+            font-size: 1.2rem;
+        }
+
+        /* Scraper Control Panel */
+        .scraper-panel {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        .scraper-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scraper-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .scraper-btn {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .scraper-btn.start {
+            background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+            color: white;
+        }
+
+        .scraper-btn.start:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+        }
+
+        .scraper-btn.stop {
+            background: linear-gradient(135deg, #e1306c 0%, #c13584 100%);
+            color: white;
+        }
+
+        .scraper-btn.stop:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(225, 48, 108, 0.3);
+        }
+
+        .scraper-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .scraper-status {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+
+        .scraper-status .stat {
+            margin-right: 15px;
+        }
+
+        .scraper-status .stat b {
+            color: #fff;
+        }
+
+        .scraper-log {
+            background: #0a0a0a;
+            border-radius: 6px;
+            padding: 8px 12px;
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.75rem;
+            color: #0f0;
+        }
+
+        .scraper-log:empty::before {
+            content: 'Scraper idle. Click Start to begin.';
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>💬 Messages</h2>
+        </div>
+        <div class="thread-list" id="thread-list">
+            <!-- Threads go here -->
+        </div>
+        <div class="scraper-panel">
+            <h3>🔍 Instagram Scraper</h3>
+            <div class="scraper-controls">
+                <button class="scraper-btn start" id="btn-start-scraper" onclick="startScraper()">▶ Start</button>
+                <button class="scraper-btn stop" id="btn-stop-scraper" onclick="stopScraper()" disabled>⏹ Stop</button>
+            </div>
+            <div class="scraper-status" id="scraper-status">
+                <span class="stat">Users: <b id="stat-users">0</b></span>
+                <span class="stat">Messages: <b id="stat-msgs">0</b></span>
+            </div>
+            <div class="scraper-log" id="scraper-log"></div>
+        </div>
+    </div>
+
+    <div class="chat-view">
+        <div class="chat-header" id="chat-header">
+            <h2>Select a chat</h2>
+        </div>
+        <div class="chat-history" id="chat-history">
+            <div class="empty-state">Select a conversation to start viewing messages</div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let activeThread = null; // { platform, chatId }
+
+        // Elements
+        const threadListEl = document.getElementById('thread-list');
+        const chatHistoryEl = document.getElementById('chat-history');
+        const chatHeaderEl = document.getElementById('chat-header');
+        const btnStart = document.getElementById('btn-start-scraper');
+        const btnStop = document.getElementById('btn-stop-scraper');
+        const statUsers = document.getElementById('stat-users');
+        const statMsgs = document.getElementById('stat-msgs');
+        const scraperLog = document.getElementById('scraper-log');
+
+        // Scraper control functions
+        function startScraper() {
+            socket.emit('start_scraper');
+            addLogEntry('▶ Starting scraper...');
+        }
+
+        function stopScraper() {
+            socket.emit('stop_scraper');
+            addLogEntry('⏹ Stopping scraper...');
+        }
+
+        function addLogEntry(message) {
+            const entry = document.createElement('div');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            scraperLog.appendChild(entry);
+            scraperLog.scrollTop = scraperLog.scrollHeight;
+            // Keep last 50 entries
+            while (scraperLog.children.length > 50) {
+                scraperLog.removeChild(scraperLog.firstChild);
+            }
+        }
+
+        // Scraper status updates
+        socket.on('scraper_status', (status) => {
+            btnStart.disabled = status.isRunning;
+            btnStop.disabled = !status.isRunning;
+            statUsers.textContent = status.usersProcessed + '/' + status.usersDiscovered;
+            statMsgs.textContent = status.totalMessages;
+            if (status.currentThread && status.isRunning) {
+                statUsers.textContent += ` (${status.currentThread.substring(0, 15)}...)`;
+            }
+        });
+
+        socket.on('scraper_log', (message) => {
+            addLogEntry(message);
+        });
+
+        // Initial Load
+        socket.on('connect', () => {
+            console.log('Connected');
+            socket.emit('get_threads');
+            socket.emit('get_scraper_status');
+        });
+
+        // 1. Render Threads
+        socket.on('threads_list', (threads) => {
+            threadListEl.innerHTML = '';
+            threads.forEach(thread => {
+                addThreadToSidebar(thread);
+            });
+        });
+
+        // 2. Render Chat History
+        socket.on('thread_history', (data) => {
+            if (!activeThread
+                || activeThread.platform !== data.platform
+                || activeThread.chatId !== data.chatId) return;
+
+            renderMessages(data.messages);
+            scrollToBottom();
+        });
+
+        // 3. Live Updates
+        socket.on('new_message', (msg) => {
+            // Update Sidebar: Move thread to top or create new
+            updateSidebarThread(msg);
+
+            // If active thread, append message
+            if (activeThread && activeThread.platform === msg.platform && activeThread.chatId === msg.chatId) {
+                appendMessage(msg);
+                scrollToBottom();
+            }
+        });
+
+        // --- Helpers ---
+
+        function addThreadToSidebar(thread) {
+            const div = document.createElement('div');
+            div.className = `thread-item ${isActive(thread) ? 'active' : ''}`;
+            div.dataset.id = `${thread.platform}:${thread.chatId}`;
+            div.onclick = () => selectThread(thread);
+
+            const timestamp = new Date(thread.lastTimestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            div.innerHTML = `
+                <div class="thread-info">
+                    <h3>${thread.senderName}</h3>
+                    <p>${thread.lastMessage || '...'}</p>
+                </div>
+                <div style="text-align: right">
+                    <span class="badge ${thread.platform}">${thread.platform}</span>
+                    <div style="font-size: 0.75rem; color: #666; margin-top: 5px;">${timestamp}</div>
+                </div>
+            `;
+            threadListEl.appendChild(div);
+        }
+
+        function updateSidebarThread(msg) {
+            // Find existing
+            const id = `${msg.platform}:${msg.chatId}`;
+            const existing = document.querySelector(`.thread-item[data-id="${id}"]`);
+
+            if (existing) {
+                // Remove and re-add to top
+                existing.remove();
+            }
+
+            // Create thread object wrapper
+            const thread = {
+                platform: msg.platform,
+                chatId: msg.chatId,
+                senderName: msg.senderName, // Might update generic names?
+                lastMessage: msg.content,
+                lastTimestamp: msg.timestamp
+            };
+
+            // Prepend to list (Top)
+            const div = document.createElement('div');
+            div.className = `thread-item ${isActive(thread) ? 'active' : ''}`;
+            div.dataset.id = id;
+            div.onclick = () => selectThread(thread);
+
+            const timestamp = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            div.innerHTML = `
+                <div class="thread-info">
+                    <h3>${msg.senderName}</h3>
+                    <p>${msg.content}</p>
+                </div>
+                <div style="text-align: right">
+                    <span class="badge ${msg.platform}">${msg.platform}</span>
+                    <div style="font-size: 0.75rem; color: #666; margin-top: 5px;">${timestamp}</div>
+                </div>
+            `;
+
+            threadListEl.prepend(div);
+        }
+
+        function selectThread(thread) {
+            activeThread = { platform: thread.platform, chatId: thread.chatId };
+
+            // UI Update
+            document.querySelectorAll('.thread-item').forEach(el => el.classList.remove('active'));
+            const el = document.querySelector(`.thread-item[data-id="${thread.platform}:${thread.chatId}"]`);
+            if (el) el.classList.add('active');
+
+            // Header
+            chatHeaderEl.innerHTML = `<h2>${thread.senderName} <span class="badge ${thread.platform}" style="font-size: 0.5em; vertical-align: middle;">${thread.platform}</span></h2>`;
+
+            // Clear and Load
+            chatHistoryEl.innerHTML = '<div class="empty-state">Loading...</div>';
+            socket.emit('get_thread_messages', activeThread);
+        }
+
+        function renderMessages(messages) {
+            chatHistoryEl.innerHTML = '';
+            if (messages.length === 0) {
+                chatHistoryEl.innerHTML = '<div class="empty-state">No messages yet.</div>';
+                return;
+            }
+            messages.forEach(appendMessage);
+        }
+
+        function appendMessage(msg) {
+            // Remove empty state if present
+            if (chatHistoryEl.querySelector('.empty-state')) {
+                chatHistoryEl.innerHTML = '';
+            }
+
+            const div = document.createElement('div');
+            div.className = `message ${msg.isFromMe ? 'outgoing' : 'incoming'}`;
+
+            const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            div.innerHTML = `
+                ${msg.content}
+                <span class="message-meta">${time}</span>
+            `;
+            chatHistoryEl.appendChild(div);
+        }
+
+        function isActive(thread) {
+            return activeThread && activeThread.platform === thread.platform && activeThread.chatId === thread.chatId;
+        }
+
+        function scrollToBottom() {
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

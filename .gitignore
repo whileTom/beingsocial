@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.env
+*.log
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Data and database files
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Debug artifacts
+*.png
+instagram_dump.html
+popup_debug.html
+
+# Credentials
+instagram_cookies.json
